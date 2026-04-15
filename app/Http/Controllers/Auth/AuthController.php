@@ -40,21 +40,19 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'email'    => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
-
-        if (! Auth::attempt($credentials, true)) {
-            return response()->json([
-                'message' => 'Email atau password tidak valid.',
-            ], 422);
+        if (! Auth::attempt($credentials)) {
+            return response()->json(['message' => 'Email atau password tidak valid.'], 422);
         }
-
-        $request->session()->regenerate();
-
+        /** @var \App\Models\User $user */
+        $user  = Auth::user();
+        $token = $user->createToken('spa')->plainTextToken;
         return response()->json([
             'message' => 'Login berhasil.',
-            'user' => $request->user()?->load('roles'),
+            'token'   => $token,
+            'user'    => $user->load('roles'),
         ]);
     }
 
@@ -67,12 +65,7 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return response()->json([
-            'message' => 'Logout berhasil.',
-        ]);
+        $request->user()->currentAccessToken()->delete();
+        return response()->json(['message' => 'Logout berhasil.']);
     }
 }
