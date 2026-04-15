@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -11,8 +12,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
-        Route::prefix('invoice')->middleware('permission:invoice.view')->group(function (): void {
-            Route::get('/', fn () => response()->json(['module' => 'invoice', 'status' => 'ok']));
+        Route::prefix('invoices')->group(function (): void {
+            Route::get('/', [InvoiceController::class, 'index'])->middleware('permission:invoice.view');
+            Route::post('/', [InvoiceController::class, 'store'])->middleware('permission:invoice.create');
+            Route::get('/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoice.view');
+            Route::put('/{invoice}', [InvoiceController::class, 'update'])->middleware('permission:invoice.update');
+            Route::delete('/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoice.delete');
         });
 
         Route::prefix('purchasing')->middleware('permission:purchasing.view')->group(function (): void {
