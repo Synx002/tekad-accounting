@@ -38,14 +38,44 @@ class ReportController extends Controller
         ]);
 
         $start = Carbon::parse($data['start_date'])->startOfDay();
-        $end = Carbon::parse($data['end_date'])->startOfDay();
-        $asOf = isset($data['as_of'])
+        $end   = Carbon::parse($data['end_date'])->startOfDay();
+        $asOf  = isset($data['as_of'])
             ? Carbon::parse($data['as_of'])->startOfDay()
             : Carbon::now()->startOfDay();
         $limit = (int) ($data['limit'] ?? 10);
 
         return response()->json(
             $this->reportService->businessPack($start, $end, $asOf, $limit)
+        );
+    }
+
+    public function incomeStatement(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date'   => ['required', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $start = Carbon::parse($data['start_date'])->startOfDay();
+        $end   = Carbon::parse($data['end_date'])->startOfDay();
+
+        return response()->json(
+            $this->reportService->incomeStatement($start, $end)
+        );
+    }
+
+    public function balanceSheet(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'as_of' => ['nullable', 'date'],
+        ]);
+
+        $asOf = isset($data['as_of'])
+            ? Carbon::parse($data['as_of'])->startOfDay()
+            : Carbon::now()->startOfDay();
+
+        return response()->json(
+            $this->reportService->balanceSheet($asOf)
         );
     }
 }

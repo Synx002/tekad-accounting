@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\Expense;
 use App\Models\FixedAsset;
 use App\Models\FixedAssetDepreciationEntry;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InventoryItem;
+use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\PurchaseBill;
 use Carbon\Carbon;
@@ -127,6 +129,179 @@ class ReportService
             ],
             'ledger_activity' => $ledgerActivity,
         ];
+    }
+
+    /**
+     * Laporan Laba Rugi (Income Statement).
+     *
+     * Menghitung saldo bersih per akun dari jurnal yang sudah diposting
+     * dalam rentang periode, lalu mengelompokkan ke revenue & expense.
+     *
+     * Konvensi normal balance:
+     *   Revenue  → kredit normal  → saldo = credit - debit
+     *   Expense  → debit normal   → saldo = debit - credit
+     *
+     * @return array<string, mixed>
+     */
+    public function incomeStatement(Carbon $start, Carbon $end): array
+    {
+        $rows = $this->periodAccountBalances($start, $end, ['revenue', 'expense']);
+
+        $revenueRows = $rows->where('type', 'revenue')->values();
+        $expenseRows = $rows->where('type', 'expense')->values();
+
+        $totalRevenue = round($revenueRows->sum('balance'), 2);
+        $totalExpense = round($expenseRows->sum('balance'), 2);
+        $netIncome    = round($totalRevenue - $totalExpense, 2);
+
+        return [
+            'period' => [
+                'start_date' => $start->toDateString(),
+                'end_date'   => $end->toDateString(),
+            ],
+            'revenue' => [
+                'accounts'      => $revenueRows,
+                'total_revenue' => $totalRevenue,
+            ],
+            'expense' => [
+                'accounts'      => $expenseRows,
+                'total_expense' => $totalExpense,
+            ],
+            'net_income'  => $netIncome,
+            'is_profit'   => $netIncome >= 0,
+        ];
+    }
+
+    /**
+     * Neraca (Balance Sheet) per tanggal tertentu.
+     *
+     * Mengakumulasi semua jurnal posted sejak awal hingga $asOf.
+     * Konvensi normal balance:
+     *   Asset     → debit normal  → saldo = debit - credit
+     *   Liability → kredit normal → saldo = credit - debit
+     *   Equity    → kredit normal → saldo = credit - debit
+     *
+     * Persamaan: Total Aset = Total Kewajiban + Total Ekuitas
+     *
+     * @return array<string, mixed>
+     */
+    public function balanceSheet(Carbon $asOf): array
+    {
+        $rows = $this->cumulativeAccountBalances($asOf, ['asset', 'liability', 'equity']);
+
+        $assetRows     = $rows->where('type', 'asset')->values();
+        $liabilityRows = $rows->where('type', 'liability')->values();
+        $equityRows    = $rows->where('type', 'equity')->values();
+
+        $totalAssets      = round($assetRows->sum('balance'), 2);
+        $totalLiabilities = round($liabilityRows->sum('balance'), 2);
+        $totalEquity      = round($equityRows->sum('balance'), 2);
+        $balanced         = abs($totalAssets - ($totalLiabilities + $totalEquity)) < 0.02;
+
+        return [
+            'as_of' => $asOf->toDateString(),
+            'assets' => [
+                'accounts'     => $assetRows,
+                'total_assets' => $totalAssets,
+            ],
+            'liabilities' => [
+                'accounts'          => $liabilityRows,
+                'total_liabilities' => $totalLiabilities,
+            ],
+            'equity' => [
+                'accounts'     => $equityRows,
+                'total_equity' => $totalEquity,
+            ],
+            'total_liabilities_and_equity' => round($totalLiabilities + $totalEquity, 2),
+            'is_balanced' => $balanced,
+        ];
+    }
+
+    /**
+     * Saldo akun per periode tertentu (hanya jurnal dalam rentang tanggal).
+     *
+     * @param  string[]  $types
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function periodAccountBalances(Carbon $start, Carbon $end, array $types): Collection
+    {
+        return JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->where('journal_entries.status', JournalEntry::STATUS_POSTED)
+            ->whereBetween('journal_entries.entry_date', [$start->toDateString(), $end->toDateString()])
+            ->whereIn('accounts.type', $types)
+            ->groupBy('accounts.id', 'accounts.code', 'accounts.name', 'accounts.type')
+            ->orderBy('accounts.code')
+            ->select([
+                'accounts.code',
+                'accounts.name',
+                'accounts.type',
+                DB::raw('SUM(journal_entry_lines.debit) as total_debit'),
+                DB::raw('SUM(journal_entry_lines.credit) as total_credit'),
+            ])
+            ->get()
+            ->map(function ($row): array {
+                $debit  = round((float) $row->total_debit, 2);
+                $credit = round((float) $row->total_credit, 2);
+
+                // Normal balance: revenue & equity & liability = credit; asset & expense = debit
+                $balance = in_array($row->type, ['revenue', 'liability', 'equity'], true)
+                    ? round($credit - $debit, 2)
+                    : round($debit - $credit, 2);
+
+                return [
+                    'code'          => $row->code,
+                    'name'          => $row->name,
+                    'type'          => $row->type,
+                    'total_debit'   => $debit,
+                    'total_credit'  => $credit,
+                    'balance'       => $balance,
+                ];
+            });
+    }
+
+    /**
+     * Akumulasi saldo akun sejak awal hingga $asOf (untuk Neraca).
+     *
+     * @param  string[]  $types
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function cumulativeAccountBalances(Carbon $asOf, array $types): Collection
+    {
+        return JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->where('journal_entries.status', JournalEntry::STATUS_POSTED)
+            ->where('journal_entries.entry_date', '<=', $asOf->toDateString())
+            ->whereIn('accounts.type', $types)
+            ->groupBy('accounts.id', 'accounts.code', 'accounts.name', 'accounts.type')
+            ->orderBy('accounts.code')
+            ->select([
+                'accounts.code',
+                'accounts.name',
+                'accounts.type',
+                DB::raw('SUM(journal_entry_lines.debit) as total_debit'),
+                DB::raw('SUM(journal_entry_lines.credit) as total_credit'),
+            ])
+            ->get()
+            ->map(function ($row): array {
+                $debit  = round((float) $row->total_debit, 2);
+                $credit = round((float) $row->total_credit, 2);
+
+                $balance = in_array($row->type, ['revenue', 'liability', 'equity'], true)
+                    ? round($credit - $debit, 2)
+                    : round($debit - $credit, 2);
+
+                return [
+                    'code'         => $row->code,
+                    'name'         => $row->name,
+                    'type'         => $row->type,
+                    'total_debit'  => $debit,
+                    'total_credit' => $credit,
+                    'balance'      => $balance,
+                ];
+            });
     }
 
     /**

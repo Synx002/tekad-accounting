@@ -11,6 +11,9 @@ class JournalEntry extends Model
 {
     use HasFactory;
 
+    public const STATUS_DRAFT  = 'draft';
+    public const STATUS_POSTED = 'posted';
+
     protected $fillable = [
         'journal_number',
         'entry_date',

@@ -88,6 +88,10 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware('permission:report.financial.view');
             Route::get('/business', [ReportController::class, 'business'])
                 ->middleware('permission:report.business.view');
+            Route::get('/income-statement', [ReportController::class, 'incomeStatement'])
+                ->middleware('permission:report.income-statement.view');
+            Route::get('/balance-sheet', [ReportController::class, 'balanceSheet'])
+                ->middleware('permission:report.balance-sheet.view');
         });
     });
 });
