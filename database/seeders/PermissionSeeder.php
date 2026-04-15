@@ -56,6 +56,7 @@ class PermissionSeeder extends Seeder
             'purchasing.create',
             'purchasing.update',
             'inventory.view',
+            'inventory.create',
             'inventory.update',
             'fixed-asset.view',
             'fixed-asset.create',
