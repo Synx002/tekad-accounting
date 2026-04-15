@@ -36,9 +36,11 @@ class ReportTest extends TestCase
                 'period' => ['start_date', 'end_date'],
                 'revenue' => ['invoice_count', 'subtotal', 'tax_total', 'grand_total', 'by_status'],
                 'purchases' => ['bill_count', 'subtotal', 'tax_total', 'grand_total', 'by_status'],
-                'estimates' => ['gross_margin', 'depreciation_expense'],
+                'expenses' => ['document_count', 'subtotal', 'tax_total', 'grand_total', 'by_status', 'by_category'],
+                'estimates' => ['gross_margin', 'depreciation_expense', 'simplified_operating_result'],
                 'inventory' => ['item_count', 'quantity_on_hand_total'],
                 'fixed_assets' => ['asset_count', 'total_cost', 'accumulated_depreciation', 'total_book_value'],
+                'ledger_activity',
             ]);
     }
 
@@ -58,6 +60,7 @@ class ReportTest extends TestCase
                 'sales_by_month',
                 'top_customers',
                 'top_products',
+                'top_expense_categories',
                 'aging_receivables' => [
                     'current',
                     'days_1_30',

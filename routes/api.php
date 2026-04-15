@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\InventoryItemController;
 use App\Http\Controllers\PurchaseBillController;
@@ -22,6 +25,14 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoice.view');
             Route::put('/{invoice}', [InvoiceController::class, 'update'])->middleware('permission:invoice.update');
             Route::delete('/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoice.delete');
+        });
+
+        Route::prefix('expenses')->group(function (): void {
+            Route::get('/', [ExpenseController::class, 'index'])->middleware('permission:expense.view');
+            Route::post('/', [ExpenseController::class, 'store'])->middleware('permission:expense.create');
+            Route::get('/{expense}', [ExpenseController::class, 'show'])->middleware('permission:expense.view');
+            Route::put('/{expense}', [ExpenseController::class, 'update'])->middleware('permission:expense.update');
+            Route::delete('/{expense}', [ExpenseController::class, 'destroy'])->middleware('permission:expense.delete');
         });
 
         Route::prefix('purchase-bills')->group(function (): void {
@@ -50,6 +61,23 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{fixedAsset}', [FixedAssetController::class, 'show'])->middleware('permission:fixed-asset.view');
             Route::put('/{fixedAsset}', [FixedAssetController::class, 'update'])->middleware('permission:fixed-asset.update');
             Route::delete('/{fixedAsset}', [FixedAssetController::class, 'destroy'])->middleware('permission:fixed-asset.delete');
+        });
+
+        Route::prefix('accounts')->group(function (): void {
+            Route::get('/', [AccountController::class, 'index'])->middleware('permission:ledger.account.view');
+            Route::post('/', [AccountController::class, 'store'])->middleware('permission:ledger.account.manage');
+            Route::get('/{account}', [AccountController::class, 'show'])->middleware('permission:ledger.account.view');
+            Route::put('/{account}', [AccountController::class, 'update'])->middleware('permission:ledger.account.manage');
+            Route::delete('/{account}', [AccountController::class, 'destroy'])->middleware('permission:ledger.account.manage');
+        });
+
+        Route::prefix('journal-entries')->group(function (): void {
+            Route::get('/', [JournalEntryController::class, 'index'])->middleware('permission:ledger.journal.view');
+            Route::post('/', [JournalEntryController::class, 'store'])->middleware('permission:ledger.journal.create');
+            Route::post('/{journalEntry}/post', [JournalEntryController::class, 'post'])->middleware('permission:ledger.journal.post');
+            Route::get('/{journalEntry}', [JournalEntryController::class, 'show'])->middleware('permission:ledger.journal.view');
+            Route::put('/{journalEntry}', [JournalEntryController::class, 'update'])->middleware('permission:ledger.journal.create');
+            Route::delete('/{journalEntry}', [JournalEntryController::class, 'destroy'])->middleware('permission:ledger.journal.delete');
         });
 
         Route::prefix('reports')->group(function (): void {

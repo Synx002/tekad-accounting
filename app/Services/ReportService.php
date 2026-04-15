@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\Expense;
 use App\Models\FixedAsset;
 use App\Models\FixedAssetDepreciationEntry;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InventoryItem;
+use App\Models\JournalEntryLine;
 use App\Models\PurchaseBill;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
@@ -26,6 +29,11 @@ class ReportService
             ->whereBetween('purchase_date', [$start->toDateString(), $end->toDateString()])
             ->get();
 
+        $expenses = Expense::query()
+            ->whereBetween('expense_date', [$start->toDateString(), $end->toDateString()])
+            ->where('status', '!=', 'void')
+            ->get();
+
         $revenueSubtotal = round((float) $invoices->sum('subtotal'), 2);
         $revenueTax = round((float) $invoices->sum('tax_total'), 2);
         $revenueGrand = round((float) $invoices->sum('grand_total'), 2);
@@ -33,6 +41,10 @@ class ReportService
         $purchaseSubtotal = round((float) $purchases->sum('subtotal'), 2);
         $purchaseTax = round((float) $purchases->sum('tax_total'), 2);
         $purchaseGrand = round((float) $purchases->sum('grand_total'), 2);
+
+        $expenseSubtotal = round((float) $expenses->sum('subtotal'), 2);
+        $expenseTax = round((float) $expenses->sum('tax_total'), 2);
+        $expenseGrand = round((float) $expenses->sum('grand_total'), 2);
 
         $periodStartKey = $start->year * 100 + $start->month;
         $periodEndKey = $end->year * 100 + $end->month;
@@ -48,6 +60,28 @@ class ReportService
         $fixedAssetsBookTotal = round((float) $fixedAssets->sum('book_value'), 2);
         $fixedAssetsCostTotal = round((float) $fixedAssets->sum('cost'), 2);
         $fixedAssetsAccumDepr = round((float) $fixedAssets->sum('accumulated_depreciation'), 2);
+
+        $ledgerActivity = JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->where('journal_entries.status', 'posted')
+            ->whereBetween('journal_entries.entry_date', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('accounts.id', 'accounts.code', 'accounts.name')
+            ->orderBy('accounts.code')
+            ->select([
+                'accounts.code',
+                'accounts.name',
+                DB::raw('SUM(journal_entry_lines.debit) as total_debit'),
+                DB::raw('SUM(journal_entry_lines.credit) as total_credit'),
+            ])
+            ->get()
+            ->map(fn ($row) => [
+                'code' => $row->code,
+                'name' => $row->name,
+                'total_debit' => round((float) $row->total_debit, 2),
+                'total_credit' => round((float) $row->total_credit, 2),
+                'net' => round((float) $row->total_debit - (float) $row->total_credit, 2),
+            ]);
 
         return [
             'period' => [
@@ -68,9 +102,18 @@ class ReportService
                 'grand_total' => $purchaseGrand,
                 'by_status' => $purchases->groupBy('status')->map->count(),
             ],
+            'expenses' => [
+                'document_count' => $expenses->count(),
+                'subtotal' => $expenseSubtotal,
+                'tax_total' => $expenseTax,
+                'grand_total' => $expenseGrand,
+                'by_status' => $expenses->groupBy('status')->map->count(),
+                'by_category' => $expenses->groupBy('category')->map(fn (Collection $g) => round((float) $g->sum('grand_total'), 2)),
+            ],
             'estimates' => [
                 'gross_margin' => round($revenueGrand - $purchaseGrand, 2),
                 'depreciation_expense' => $depreciation,
+                'simplified_operating_result' => round($revenueGrand - $purchaseGrand - $expenseGrand - $depreciation, 2),
             ],
             'inventory' => [
                 'item_count' => $inventoryItems,
@@ -82,6 +125,7 @@ class ReportService
                 'accumulated_depreciation' => $fixedAssetsAccumDepr,
                 'total_book_value' => $fixedAssetsBookTotal,
             ],
+            'ledger_activity' => $ledgerActivity,
         ];
     }
 
@@ -118,6 +162,22 @@ class ReportService
 
         $topProducts = $this->topInvoiceLineProducts($start, $end, $limit);
 
+        $expenses = Expense::query()
+            ->whereBetween('expense_date', [$start->toDateString(), $end->toDateString()])
+            ->where('status', '!=', 'void')
+            ->get();
+
+        $topExpenseCategories = $expenses
+            ->groupBy('category')
+            ->map(fn (Collection $group, string $cat) => [
+                'category' => $cat,
+                'document_count' => $group->count(),
+                'grand_total' => round((float) $group->sum('grand_total'), 2),
+            ])
+            ->sortByDesc('grand_total')
+            ->values()
+            ->take($limit);
+
         return [
             'period' => [
                 'start_date' => $start->toDateString(),
@@ -127,6 +187,7 @@ class ReportService
             'sales_by_month' => $salesByMonth,
             'top_customers' => $topCustomers,
             'top_products' => $topProducts,
+            'top_expense_categories' => $topExpenseCategories,
             'aging_receivables' => $this->agingReceivables($asOf),
             'aging_payables' => $this->agingPayables($asOf),
         ];

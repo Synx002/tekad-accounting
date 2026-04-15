@@ -22,6 +22,10 @@ class PermissionSeeder extends Seeder
             'purchasing.create',
             'purchasing.update',
             'purchasing.delete',
+            'expense.view',
+            'expense.create',
+            'expense.update',
+            'expense.delete',
             'inventory.view',
             'inventory.create',
             'inventory.update',
@@ -32,6 +36,12 @@ class PermissionSeeder extends Seeder
             'fixed-asset.delete',
             'report.financial.view',
             'report.business.view',
+            'ledger.account.view',
+            'ledger.account.manage',
+            'ledger.journal.view',
+            'ledger.journal.create',
+            'ledger.journal.post',
+            'ledger.journal.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -55,6 +65,10 @@ class PermissionSeeder extends Seeder
             'purchasing.view',
             'purchasing.create',
             'purchasing.update',
+            'expense.view',
+            'expense.create',
+            'expense.update',
+            'expense.delete',
             'inventory.view',
             'inventory.create',
             'inventory.update',
@@ -63,6 +77,12 @@ class PermissionSeeder extends Seeder
             'fixed-asset.update',
             'report.financial.view',
             'report.business.view',
+            'ledger.account.view',
+            'ledger.account.manage',
+            'ledger.journal.view',
+            'ledger.journal.create',
+            'ledger.journal.post',
+            'ledger.journal.delete',
         ]);
 
         $kasir = Role::findByName('Kasir', 'web');
@@ -70,6 +90,8 @@ class PermissionSeeder extends Seeder
             'invoice.view',
             'invoice.create',
             'purchasing.view',
+            'expense.view',
+            'expense.create',
             'inventory.view',
             'inventory.update',
             'report.business.view',
@@ -79,10 +101,13 @@ class PermissionSeeder extends Seeder
         $viewer->syncPermissions([
             'invoice.view',
             'purchasing.view',
+            'expense.view',
             'inventory.view',
             'fixed-asset.view',
             'report.financial.view',
             'report.business.view',
+            'ledger.account.view',
+            'ledger.journal.view',
         ]);
     }
 }
