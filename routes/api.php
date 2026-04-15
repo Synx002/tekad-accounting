@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('invoices')->group(function (): void {
             Route::get('/', [InvoiceController::class, 'index'])->middleware('permission:invoice.view');
             Route::post('/', [InvoiceController::class, 'store'])->middleware('permission:invoice.create');
+            Route::post('/{invoice}/pay', [InvoiceController::class, 'pay'])->middleware('permission:invoice.update');
             Route::get('/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoice.view');
             Route::put('/{invoice}', [InvoiceController::class, 'update'])->middleware('permission:invoice.update');
             Route::delete('/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoice.delete');

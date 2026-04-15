@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\UpdateInvoiceRequest;
 use App\Models\Invoice;
+use App\Services\InvoiceJournalService;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
 {
-    public function __construct(private readonly InvoiceService $invoiceService)
-    {
+    public function __construct(
+        private readonly InvoiceService $invoiceService,
+        private readonly InvoiceJournalService $invoiceJournalService,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -61,6 +64,22 @@ class InvoiceController extends Controller
 
         return response()->json([
             'message' => 'Invoice berhasil dihapus.',
+        ]);
+    }
+
+    public function pay(Request $request, Invoice $invoice): JsonResponse
+    {
+        $journalEntry = $this->invoiceJournalService->postPaid(
+            $invoice,
+            (int) $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'Invoice berhasil ditandai lunas dan jurnal diposting.',
+            'data' => [
+                'invoice' => $invoice->fresh('items', 'journalEntries'),
+                'journal_entry' => $journalEntry,
+            ],
         ]);
     }
 }

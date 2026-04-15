@@ -22,6 +22,8 @@ class ChartOfAccountsSeeder extends Seeder
             ['code' => '5-5100', 'name' => 'Beban Pokok Penjualan', 'type' => 'expense', 'sort_order' => 410],
             ['code' => '5-5200', 'name' => 'Beban Operasional', 'type' => 'expense', 'sort_order' => 420],
             ['code' => '5-5300', 'name' => 'Beban Penyusutan', 'type' => 'expense', 'sort_order' => 430],
+            ['code' => '2-2200', 'name' => 'PPN Keluaran', 'type' => 'liability', 'sort_order' => 120],
+            ['code' => '2-2300', 'name' => 'PPN Masukan', 'type' => 'asset', 'sort_order' => 70],
         ];
 
         foreach ($rows as $row) {
