@@ -5,6 +5,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\InventoryItemController;
 use App\Http\Controllers\PurchaseBillController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -52,9 +53,9 @@ Route::prefix('v1')->group(function (): void {
         });
 
         Route::prefix('reports')->group(function (): void {
-            Route::get('/financial', fn () => response()->json(['module' => 'reports.financial', 'status' => 'ok']))
+            Route::get('/financial', [ReportController::class, 'financial'])
                 ->middleware('permission:report.financial.view');
-            Route::get('/business', fn () => response()->json(['module' => 'reports.business', 'status' => 'ok']))
+            Route::get('/business', [ReportController::class, 'business'])
                 ->middleware('permission:report.business.view');
         });
     });

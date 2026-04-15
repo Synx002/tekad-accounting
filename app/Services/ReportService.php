@@ -1,0 +1,230 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\FixedAsset;
+use App\Models\FixedAssetDepreciationEntry;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\InventoryItem;
+use App\Models\PurchaseBill;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+
+class ReportService
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function financialSummary(Carbon $start, Carbon $end): array
+    {
+        $invoices = Invoice::query()
+            ->whereBetween('invoice_date', [$start->toDateString(), $end->toDateString()])
+            ->get();
+
+        $purchases = PurchaseBill::query()
+            ->whereBetween('purchase_date', [$start->toDateString(), $end->toDateString()])
+            ->get();
+
+        $revenueSubtotal = round((float) $invoices->sum('subtotal'), 2);
+        $revenueTax = round((float) $invoices->sum('tax_total'), 2);
+        $revenueGrand = round((float) $invoices->sum('grand_total'), 2);
+
+        $purchaseSubtotal = round((float) $purchases->sum('subtotal'), 2);
+        $purchaseTax = round((float) $purchases->sum('tax_total'), 2);
+        $purchaseGrand = round((float) $purchases->sum('grand_total'), 2);
+
+        $periodStartKey = $start->year * 100 + $start->month;
+        $periodEndKey = $end->year * 100 + $end->month;
+
+        $depreciation = round((float) FixedAssetDepreciationEntry::query()
+            ->whereRaw('(period_year * 100 + period_month) BETWEEN ? AND ?', [$periodStartKey, $periodEndKey])
+            ->sum('amount'), 2);
+
+        $inventoryItems = InventoryItem::query()->count();
+        $inventoryQty = round((float) InventoryItem::query()->sum('quantity_on_hand'), 2);
+
+        $fixedAssets = FixedAsset::query()->get();
+        $fixedAssetsBookTotal = round((float) $fixedAssets->sum('book_value'), 2);
+        $fixedAssetsCostTotal = round((float) $fixedAssets->sum('cost'), 2);
+        $fixedAssetsAccumDepr = round((float) $fixedAssets->sum('accumulated_depreciation'), 2);
+
+        return [
+            'period' => [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+            ],
+            'revenue' => [
+                'invoice_count' => $invoices->count(),
+                'subtotal' => $revenueSubtotal,
+                'tax_total' => $revenueTax,
+                'grand_total' => $revenueGrand,
+                'by_status' => $invoices->groupBy('status')->map->count(),
+            ],
+            'purchases' => [
+                'bill_count' => $purchases->count(),
+                'subtotal' => $purchaseSubtotal,
+                'tax_total' => $purchaseTax,
+                'grand_total' => $purchaseGrand,
+                'by_status' => $purchases->groupBy('status')->map->count(),
+            ],
+            'estimates' => [
+                'gross_margin' => round($revenueGrand - $purchaseGrand, 2),
+                'depreciation_expense' => $depreciation,
+            ],
+            'inventory' => [
+                'item_count' => $inventoryItems,
+                'quantity_on_hand_total' => $inventoryQty,
+            ],
+            'fixed_assets' => [
+                'asset_count' => $fixedAssets->count(),
+                'total_cost' => $fixedAssetsCostTotal,
+                'accumulated_depreciation' => $fixedAssetsAccumDepr,
+                'total_book_value' => $fixedAssetsBookTotal,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function businessPack(Carbon $start, Carbon $end, Carbon $asOf, int $limit = 10): array
+    {
+        $invoices = Invoice::query()
+            ->whereBetween('invoice_date', [$start->toDateString(), $end->toDateString()])
+            ->get();
+
+        $salesByMonth = $invoices
+            ->groupBy(fn (Invoice $i) => $i->invoice_date->format('Y-m'))
+            ->map(fn (Collection $group, string $ym) => [
+                'month' => $ym,
+                'invoice_count' => $group->count(),
+                'grand_total' => round((float) $group->sum('grand_total'), 2),
+            ])
+            ->values()
+            ->sortBy('month')
+            ->values();
+
+        $topCustomers = $invoices
+            ->groupBy('customer_name')
+            ->map(fn (Collection $group, string $name) => [
+                'customer_name' => $name,
+                'invoice_count' => $group->count(),
+                'grand_total' => round((float) $group->sum('grand_total'), 2),
+            ])
+            ->sortByDesc('grand_total')
+            ->values()
+            ->take($limit);
+
+        $topProducts = $this->topInvoiceLineProducts($start, $end, $limit);
+
+        return [
+            'period' => [
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'as_of' => $asOf->toDateString(),
+            ],
+            'sales_by_month' => $salesByMonth,
+            'top_customers' => $topCustomers,
+            'top_products' => $topProducts,
+            'aging_receivables' => $this->agingReceivables($asOf),
+            'aging_payables' => $this->agingPayables($asOf),
+        ];
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function topInvoiceLineProducts(Carbon $start, Carbon $end, int $limit): Collection
+    {
+        $rows = InvoiceItem::query()
+            ->whereHas('invoice', function ($q) use ($start, $end): void {
+                $q->whereBetween('invoice_date', [$start->toDateString(), $end->toDateString()]);
+            })
+            ->get();
+
+        return $rows
+            ->groupBy('description')
+            ->map(fn (Collection $lines, string $desc) => [
+                'description' => $desc,
+                'quantity' => round((float) $lines->sum('quantity'), 2),
+                'line_total' => round((float) $lines->sum('line_total'), 2),
+            ])
+            ->sortByDesc('line_total')
+            ->values()
+            ->take($limit);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function agingReceivables(Carbon $asOf): array
+    {
+        $open = Invoice::query()
+            ->whereNotIn('status', ['paid', 'cancelled'])
+            ->get();
+
+        return $this->bucketOutstanding($open, $asOf, fn (Invoice $i) => $i->due_date ?? $i->invoice_date, 'grand_total');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function agingPayables(Carbon $asOf): array
+    {
+        $open = PurchaseBill::query()
+            ->whereNotIn('status', ['paid', 'cancelled'])
+            ->get();
+
+        return $this->bucketOutstanding($open, $asOf, fn (PurchaseBill $b) => $b->due_date ?? $b->purchase_date, 'grand_total');
+    }
+
+    /**
+     * @param  Collection<int, Invoice|PurchaseBill>  $rows
+     * @param  callable(Invoice|PurchaseBill): \Carbon\Carbon  $dueResolver
+     * @return array<string, mixed>
+     */
+    private function bucketOutstanding(Collection $rows, Carbon $asOf, callable $dueResolver, string $amountField): array
+    {
+        $buckets = [
+            'current' => ['count' => 0, 'amount' => 0.0],
+            'days_1_30' => ['count' => 0, 'amount' => 0.0],
+            'days_31_60' => ['count' => 0, 'amount' => 0.0],
+            'days_61_90' => ['count' => 0, 'amount' => 0.0],
+            'days_over_90' => ['count' => 0, 'amount' => 0.0],
+        ];
+
+        foreach ($rows as $row) {
+            /** @var \Carbon\Carbon $due */
+            $due = Carbon::parse($dueResolver($row)->toDateString());
+            $amount = (float) $row->{$amountField};
+
+            if ($due->greaterThan($asOf)) {
+                $key = 'current';
+            } else {
+                $daysOverdue = $due->diffInDays($asOf);
+                if ($daysOverdue <= 30) {
+                    $key = 'days_1_30';
+                } elseif ($daysOverdue <= 60) {
+                    $key = 'days_31_60';
+                } elseif ($daysOverdue <= 90) {
+                    $key = 'days_61_90';
+                } else {
+                    $key = 'days_over_90';
+                }
+            }
+
+            $buckets[$key]['count']++;
+            $buckets[$key]['amount'] += $amount;
+        }
+
+        foreach ($buckets as $k => $v) {
+            $buckets[$k]['amount'] = round($v['amount'], 2);
+        }
+
+        $buckets['open_document_count'] = $rows->count();
+        $buckets['open_amount_total'] = round((float) $rows->sum($amountField), 2);
+
+        return $buckets;
+    }
+}
