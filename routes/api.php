@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PurchaseBillController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -20,8 +21,12 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoice.delete');
         });
 
-        Route::prefix('purchasing')->middleware('permission:purchasing.view')->group(function (): void {
-            Route::get('/', fn () => response()->json(['module' => 'purchasing', 'status' => 'ok']));
+        Route::prefix('purchase-bills')->group(function (): void {
+            Route::get('/', [PurchaseBillController::class, 'index'])->middleware('permission:purchasing.view');
+            Route::post('/', [PurchaseBillController::class, 'store'])->middleware('permission:purchasing.create');
+            Route::get('/{purchaseBill}', [PurchaseBillController::class, 'show'])->middleware('permission:purchasing.view');
+            Route::put('/{purchaseBill}', [PurchaseBillController::class, 'update'])->middleware('permission:purchasing.update');
+            Route::delete('/{purchaseBill}', [PurchaseBillController::class, 'destroy'])->middleware('permission:purchasing.delete');
         });
 
         Route::prefix('inventory')->middleware('permission:inventory.view')->group(function (): void {
