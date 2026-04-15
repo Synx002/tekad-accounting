@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('purchase-bills')->group(function (): void {
             Route::get('/', [PurchaseBillController::class, 'index'])->middleware('permission:purchasing.view');
             Route::post('/', [PurchaseBillController::class, 'store'])->middleware('permission:purchasing.create');
+            Route::post('/{purchaseBill}/pay', [PurchaseBillController::class, 'pay'])->middleware('permission:purchasing.update');
             Route::get('/{purchaseBill}', [PurchaseBillController::class, 'show'])->middleware('permission:purchasing.view');
             Route::put('/{purchaseBill}', [PurchaseBillController::class, 'update'])->middleware('permission:purchasing.update');
             Route::delete('/{purchaseBill}', [PurchaseBillController::class, 'destroy'])->middleware('permission:purchasing.delete');

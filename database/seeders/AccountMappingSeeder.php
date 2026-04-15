@@ -26,6 +26,24 @@ class AccountMappingSeeder extends Seeder
             'code' => '1-1200',
             'description' => 'Bank — debit saat invoice dibayar (lunas)',
         ],
+
+        // Purchase Bill
+        'purchase_bill.payable' => [
+            'code' => '2-2100',
+            'description' => 'Hutang Usaha — kredit saat purchase bill dibuat/diterima',
+        ],
+        'purchase_bill.expense' => [
+            'code' => '5-5100',
+            'description' => 'Beban Pokok Penjualan — debit saat purchase bill dibuat/diterima',
+        ],
+        'purchase_bill.tax_input' => [
+            'code' => '2-2300',
+            'description' => 'PPN Masukan — debit saat ada pajak di purchase bill',
+        ],
+        'purchase_bill.cash' => [
+            'code' => '1-1200',
+            'description' => 'Bank — kredit saat purchase bill dibayar (lunas)',
+        ],
     ];
 
     public function run(): void

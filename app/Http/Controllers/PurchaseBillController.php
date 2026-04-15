@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePurchaseBillRequest;
 use App\Http\Requests\UpdatePurchaseBillRequest;
 use App\Models\PurchaseBill;
+use App\Services\PurchaseBillJournalService;
 use App\Services\PurchaseBillService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PurchaseBillController extends Controller
 {
-    public function __construct(private readonly PurchaseBillService $purchaseBillService)
-    {
+    public function __construct(
+        private readonly PurchaseBillService $purchaseBillService,
+        private readonly PurchaseBillJournalService $purchaseBillJournalService,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -61,6 +64,22 @@ class PurchaseBillController extends Controller
 
         return response()->json([
             'message' => 'Purchase bill berhasil dihapus.',
+        ]);
+    }
+
+    public function pay(Request $request, PurchaseBill $purchaseBill): JsonResponse
+    {
+        $journalEntry = $this->purchaseBillJournalService->postPaid(
+            $purchaseBill,
+            (int) $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'Purchase bill berhasil ditandai lunas dan jurnal diposting.',
+            'data' => [
+                'purchase_bill' => $purchaseBill->fresh('items', 'journalEntries'),
+                'journal_entry' => $journalEntry,
+            ],
         ]);
     }
 }
