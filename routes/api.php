@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('expenses')->group(function (): void {
             Route::get('/', [ExpenseController::class, 'index'])->middleware('permission:expense.view');
             Route::post('/', [ExpenseController::class, 'store'])->middleware('permission:expense.create');
+            Route::post('/{expense}/pay', [ExpenseController::class, 'pay'])->middleware('permission:expense.update');
             Route::get('/{expense}', [ExpenseController::class, 'show'])->middleware('permission:expense.view');
             Route::put('/{expense}', [ExpenseController::class, 'update'])->middleware('permission:expense.update');
             Route::delete('/{expense}', [ExpenseController::class, 'destroy'])->middleware('permission:expense.delete');

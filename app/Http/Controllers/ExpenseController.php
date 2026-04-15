@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreExpenseRequest;
 use App\Http\Requests\UpdateExpenseRequest;
 use App\Models\Expense;
+use App\Services\ExpenseJournalService;
 use App\Services\ExpenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
-    public function __construct(private readonly ExpenseService $expenseService)
-    {
+    public function __construct(
+        private readonly ExpenseService $expenseService,
+        private readonly ExpenseJournalService $expenseJournalService,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -58,6 +61,22 @@ class ExpenseController extends Controller
 
         return response()->json([
             'message' => 'Biaya berhasil dihapus.',
+        ]);
+    }
+
+    public function pay(Request $request, Expense $expense): JsonResponse
+    {
+        $journalEntry = $this->expenseJournalService->postPaid(
+            $expense,
+            (int) $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'Biaya berhasil ditandai lunas dan jurnal diposting.',
+            'data' => [
+                'expense'       => $expense->fresh('journalEntries'),
+                'journal_entry' => $journalEntry,
+            ],
         ]);
     }
 }

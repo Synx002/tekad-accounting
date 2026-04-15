@@ -2,13 +2,19 @@
 
 namespace App\Services;
 
+use App\Models\AccountMapping;
 use App\Models\FixedAsset;
 use App\Models\FixedAssetDepreciationEntry;
+use App\Models\JournalEntry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class FixedAssetDepreciationService
 {
+    public function __construct(private readonly JournalEntryService $journalEntryService)
+    {
+    }
+
     public function recordPeriod(FixedAsset $asset, int $year, int $month, int $userId, ?string $note = null): FixedAssetDepreciationEntry
     {
         return DB::transaction(function () use ($asset, $year, $month, $userId, $note): FixedAssetDepreciationEntry {
@@ -82,23 +88,92 @@ class FixedAssetDepreciationService
 
             $entry = FixedAssetDepreciationEntry::query()->create([
                 'fixed_asset_id' => $locked->id,
-                'period_year' => $year,
-                'period_month' => $month,
-                'amount' => $amount,
+                'period_year'    => $year,
+                'period_month'   => $month,
+                'amount'         => $amount,
                 'book_value_after' => $newBook,
-                'note' => $note,
-                'created_by' => $userId,
+                'note'           => $note,
+                'created_by'     => $userId,
             ]);
 
             $status = $newBook <= (float) $locked->salvage_value + 0.005 ? 'fully_depreciated' : 'active';
 
             $locked->update([
                 'accumulated_depreciation' => $newAccumulated,
-                'book_value' => $newBook,
-                'status' => $status,
+                'book_value'  => $newBook,
+                'status'      => $status,
             ]);
+
+            $this->postDepreciationJournal($entry, $locked, $amount, $year, $month, $userId);
 
             return $entry;
         });
+    }
+
+    private function postDepreciationJournal(
+        FixedAssetDepreciationEntry $entry,
+        FixedAsset $asset,
+        float $amount,
+        int $year,
+        int $month,
+        int $userId
+    ): void {
+        $depExpenseAccount = AccountMapping::getAccount('depreciation.expense');
+        $accumAccount      = AccountMapping::getAccount('depreciation.accumulated');
+
+        $periodLabel = sprintf('%04d-%02d', $year, $month);
+        $description = sprintf(
+            'Penyusutan %s — %s periode %s',
+            $asset->asset_code,
+            $asset->name,
+            $periodLabel
+        );
+
+        $journalEntry = JournalEntry::query()->create([
+            'journal_number' => $this->nextJournalNumber(),
+            'entry_date'     => now()->toDateString(),
+            'reference'      => $asset->asset_code,
+            'description'    => $description,
+            'status'         => 'draft',
+            'created_by'     => $userId,
+            'source_type'    => FixedAssetDepreciationEntry::class,
+            'source_id'      => $entry->id,
+        ]);
+
+        $journalEntry->lines()->createMany([
+            [
+                'account_id'  => $depExpenseAccount->id,
+                'debit'       => $amount,
+                'credit'      => 0,
+                'description' => $description,
+                'sort_order'  => 0,
+            ],
+            [
+                'account_id'  => $accumAccount->id,
+                'debit'       => 0,
+                'credit'      => $amount,
+                'description' => $description,
+                'sort_order'  => 1,
+            ],
+        ]);
+
+        $this->journalEntryService->post($journalEntry);
+    }
+
+    private function nextJournalNumber(): string
+    {
+        $prefix = 'JE-'.now()->format('Ymd');
+        $last   = JournalEntry::query()
+            ->where('journal_number', 'like', $prefix.'-%')
+            ->orderByDesc('id')
+            ->first();
+
+        $next = 1;
+        if ($last) {
+            $parts = explode('-', $last->journal_number);
+            $next  = (int) end($parts) + 1;
+        }
+
+        return sprintf('%s-%04d', $prefix, $next);
     }
 }
