@@ -92,6 +92,8 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware('permission:report.income-statement.view');
             Route::get('/balance-sheet', [ReportController::class, 'balanceSheet'])
                 ->middleware('permission:report.balance-sheet.view');
+            Route::get('/cash-book', [ReportController::class, 'cashBook'])
+                ->middleware('permission:report.cash-book.view');
         });
     });
 });

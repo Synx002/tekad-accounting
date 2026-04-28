@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Edit, Trash2, CheckCircle, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, CheckCircle, Loader2, Receipt } from 'lucide-react'
 import { purchaseBillsApi } from '@/api/purchaseBills'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,72 +30,181 @@ export default function PurchaseBillsPage() {
 
   const payMutation = useMutation({
     mutationFn: (id: number) => purchaseBillsApi.pay(id),
-    onSuccess: () => { setPayingId(null); qc.invalidateQueries({ queryKey: ['purchase-bills'] }) },
+    onSuccess: () => {
+      setPayingId(null)
+      qc.invalidateQueries({ queryKey: ['purchase-bills'] })
+    },
     onError: () => setPayingId(null),
   })
 
   const handleDelete = (b: PurchaseBill) => {
-    if (confirm(`Hapus purchase bill ${b.purchase_number}?`)) deleteMutation.mutate(b.id)
+    if (confirm(`Hapus purchase bill ${b.purchase_number}?`)) {
+      deleteMutation.mutate(b.id)
+    }
   }
+
   const handlePay = (b: PurchaseBill) => {
     if (confirm(`Tandai ${b.purchase_number} sebagai LUNAS dan posting jurnal?`)) {
-      setPayingId(b.id); payMutation.mutate(b.id)
+      setPayingId(b.id)
+      payMutation.mutate(b.id)
     }
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Purchase Bill"
         description="Kelola tagihan pembelian"
         action={
-          <Button asChild>
-            <Link to="/purchase-bills/create"><Plus className="w-4 h-4 mr-2" />Buat Bill</Link>
+          <Button className="gap-2 shadow-sm">
+            <Link to="/purchase-bills/create" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Buat Bill
+            </Link>
           </Button>
         }
       />
-      <Card>
+
+      <Card className="shadow-sm border border-gray-200 rounded-xl overflow-hidden">
         <CardContent className="p-0">
-          {isLoading ? <Spinner /> : (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-24">
+              <Spinner />
+            </div>
+          ) : (
             <>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Nomor</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                  <TableRow className="bg-gray-50 border-b border-gray-200 hover:bg-gray-50">
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide pl-6 py-3 w-[160px]">
+                      Nomor Bill
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[120px]">
+                      Tanggal
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3">
+                      Supplier
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 text-right w-[150px]">
+                      Total
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[110px]">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide pr-6 py-3 text-right w-[100px]">
+                      Aksi
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {data?.data.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-gray-400 py-12">Belum ada purchase bill</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6}>
+                        <div className="flex flex-col items-center justify-center py-20 gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                            <Receipt className="w-6 h-6 text-gray-300" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-gray-500">Belum ada purchase bill</p>
+                            <p className="text-xs text-gray-400 mt-1">Buat tagihan pembelian pertama Anda sekarang</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                  {data?.data.map((b) => (
-                    <TableRow key={b.id}>
-                      <TableCell className="font-mono text-xs font-medium">{b.purchase_number}</TableCell>
-                      <TableCell className="text-sm">{formatDate(b.purchase_date)}</TableCell>
-                      <TableCell className="text-sm font-medium">{b.supplier_name}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(b.grand_total)}</TableCell>
-                      <TableCell><StatusBadge status={b.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          {b.status !== 'paid' && b.status !== 'cancelled' && (
+
+                  {data?.data.map((b, index) => (
+                    <TableRow
+                      key={b.id}
+                      className={`
+                        border-b border-gray-100 transition-colors duration-100
+                        hover:bg-blue-50/40
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
+                      `}
+                    >
+                      {/* Nomor Bill */}
+                      <TableCell className="pl-6 py-4">
+                        <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 whitespace-nowrap">
+                          {b.purchase_number}
+                        </span>
+                      </TableCell>
+
+                      {/* Tanggal */}
+                      <TableCell className="py-4">
+                        <span className="text-sm text-gray-600">{formatDate(b.purchase_date)}</span>
+                      </TableCell>
+
+                      {/* Supplier */}
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 select-none">
+                            {b.supplier_name?.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium text-gray-800 truncate max-w-[200px]">
+                            {b.supplier_name}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* Total */}
+                      <TableCell className="py-4 text-right">
+                        <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                          {formatCurrency(b.grand_total)}
+                        </span>
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell className="py-4">
+                        <StatusBadge status={b.status} />
+                      </TableCell>
+
+                      {/* Aksi */}
+                      <TableCell className="py-4 pr-6">
+                        <div className="flex justify-end items-center gap-0.5">
+                          {b.status !== 'paid' && b.status !== 'cancelled' ? (
                             <>
-                              <Button variant="ghost" size="icon" asChild>
-                                <Link to={`/purchase-bills/${b.id}/edit`}><Edit className="w-4 h-4" /></Link>
+                              {/* Edit */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                asChild
+                              >
+                                <Link to={`/purchase-bills/${b.id}/edit`}>
+                                  <Edit className="w-3.5 h-3.5" />
+                                </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50"
-                                onClick={() => handlePay(b)} disabled={payingId === b.id}>
-                                {payingId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+
+                              {/* Bayar */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                                onClick={() => handlePay(b)}
+                                disabled={payingId === b.id}
+                                title="Tandai Lunas"
+                              >
+                                {payingId === b.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
                               </Button>
-                              <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50"
-                                onClick={() => handleDelete(b)}>
-                                <Trash2 className="w-4 h-4" />
+
+                              {/* Hapus */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                onClick={() => handleDelete(b)}
+                                title="Hapus Bill"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </>
+                          ) : (
+                            <span className="text-xs text-gray-300 pr-2">—</span>
                           )}
                         </div>
                       </TableCell>
@@ -103,9 +212,20 @@ export default function PurchaseBillsPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="px-4 pb-4">
-                <Pagination currentPage={data?.current_page ?? 1} lastPage={data?.last_page ?? 1} onPageChange={setPage} />
-              </div>
+
+              {/* Pagination */}
+              {(data?.last_page ?? 1) > 1 && (
+                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-xs text-gray-400">
+                    Halaman {data?.current_page ?? 1} dari {data?.last_page ?? 1}
+                  </p>
+                  <Pagination
+                    currentPage={data?.current_page ?? 1}
+                    lastPage={data?.last_page ?? 1}
+                    onPageChange={setPage}
+                  />
+                </div>
+              )}
             </>
           )}
         </CardContent>

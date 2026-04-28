@@ -101,9 +101,9 @@ export interface InventoryMovement {
   type: 'in' | 'out' | 'adjustment'
   quantity_change: number
   quantity_after: number
-  reference: string | null
-  notes: string | null
+  note: string | null
   created_at: string
+  creator?: { id: number; name: string }
 }
 
 // Fixed Asset
@@ -114,12 +114,12 @@ export interface FixedAsset {
   description: string | null
   location: string | null
   acquisition_date: string
-  cost: string
-  salvage_value: string
+  cost: number
+  salvage_value: number | null
   useful_life_months: number
-  depreciation_method: string
-  accumulated_depreciation: string
-  book_value: string
+  depreciation_method: 'straight_line'
+  accumulated_depreciation: number
+  book_value: number
   status: 'active' | 'fully_depreciated' | 'disposed'
   created_by: number
   depreciation_entries_count?: number
@@ -130,10 +130,14 @@ export interface DepreciationEntry {
   fixed_asset_id: number
   period_year: number
   period_month: number
-  amount: string
-  book_value_after: string
+  amount: number
+  book_value_after: number
+  accumulated_depreciation?: number
+  depreciation_amount?: number
+  status?: string
   note: string | null
   created_at: string
+  creator?: { id: number; name: string }
 }
 
 // Account
@@ -198,4 +202,25 @@ export interface BalanceSheet {
   equity: { accounts: AccountBalance[]; total_equity: number }
   total_liabilities_and_equity: number
   is_balanced: boolean
+}
+
+export interface CashBookRow {
+  date: string
+  journal_number: string
+  description: string | null
+  account_code: string
+  account_name: string
+  pemasukan: number | null
+  pengeluaran: number | null
+  saldo: number
+}
+
+export interface CashBook {
+  period: { start_date: string; end_date: string }
+  account_codes: string[]
+  opening_balance: number
+  total_pemasukan: number
+  total_pengeluaran: number
+  closing_balance: number
+  rows: CashBookRow[]
 }

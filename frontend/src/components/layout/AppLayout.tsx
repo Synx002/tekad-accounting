@@ -9,6 +9,7 @@ import {
   Building2,
   BarChart3,
   BookOpen,
+  BookMarked,
   LogOut,
   Menu,
   X,
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/expenses', label: 'Biaya', icon: Receipt },
   { to: '/inventory', label: 'Inventori', icon: Package },
   { to: '/fixed-assets', label: 'Aset Tetap', icon: Building2 },
+  { to: '/cash-book', label: 'Buku Kas', icon: BookMarked },
   { to: '/reports', label: 'Laporan', icon: BarChart3 },
   { to: '/journal-entries', label: 'Jurnal', icon: BookOpen },
 ]

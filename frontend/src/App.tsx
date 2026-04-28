@@ -13,8 +13,16 @@ import PurchaseBillFormPage from '@/pages/purchase-bills/PurchaseBillFormPage'
 import ExpensesPage from '@/pages/expenses/ExpensesPage'
 import ExpenseFormPage from '@/pages/expenses/ExpenseFormPage'
 import InventoryPage from '@/pages/inventory/InventoryPage'
+import InventoryFormPage from '@/pages/inventory/InventoryFormPage'
+import InventoryMovementsPage from '@/pages/inventory/InventoryMovementsPage'
 import FixedAssetsPage from '@/pages/fixed-assets/FixedAssetsPage'
+import FixedAssetFormPage from '@/pages/fixed-assets/FixedAssetFormPage'
+import FixedAssetDepreciationPage from '@/pages/fixed-assets/FixedAssetDepreciationPage'
+import CashBookPage from '@/pages/reports/CashBookPage'
 import ReportsPage from '@/pages/reports/ReportsPage'
+import JournalEntriesPage from '@/pages/journal-entries/JournalEntriesPage'
+import JournalEntryFormPage from '@/pages/journal-entries/JournalEntryFormPage'
+import JournalEntryDetailPage from '@/pages/journal-entries/JournalEntryDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,10 +60,22 @@ export default function App() {
           <Route path="/expenses/:id/edit" element={<PrivateRoute><ExpenseFormPage /></PrivateRoute>} />
 
           <Route path="/inventory" element={<PrivateRoute><InventoryPage /></PrivateRoute>} />
+          <Route path="/inventory/create" element={<PrivateRoute><InventoryFormPage /></PrivateRoute>} />
+          <Route path="/inventory/:id/edit" element={<PrivateRoute><InventoryFormPage /></PrivateRoute>} />
+          <Route path="/inventory/:id/movements" element={<PrivateRoute><InventoryMovementsPage /></PrivateRoute>} />
 
           <Route path="/fixed-assets" element={<PrivateRoute><FixedAssetsPage /></PrivateRoute>} />
+          <Route path="/fixed-assets/create" element={<PrivateRoute><FixedAssetFormPage /></PrivateRoute>} />
+          <Route path="/fixed-assets/:id/edit" element={<PrivateRoute><FixedAssetFormPage /></PrivateRoute>} />
+          <Route path="/fixed-assets/:id/depreciation" element={<PrivateRoute><FixedAssetDepreciationPage /></PrivateRoute>} />
 
+          <Route path="/cash-book" element={<PrivateRoute><CashBookPage /></PrivateRoute>} />
           <Route path="/reports" element={<PrivateRoute><ReportsPage /></PrivateRoute>} />
+
+          <Route path="/journal-entries" element={<PrivateRoute><JournalEntriesPage /></PrivateRoute>} />
+          <Route path="/journal-entries/create" element={<PrivateRoute><JournalEntryFormPage /></PrivateRoute>} />
+          <Route path="/journal-entries/:id" element={<PrivateRoute><JournalEntryDetailPage /></PrivateRoute>} />
+          <Route path="/journal-entries/:id/edit" element={<PrivateRoute><JournalEntryFormPage /></PrivateRoute>} />
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

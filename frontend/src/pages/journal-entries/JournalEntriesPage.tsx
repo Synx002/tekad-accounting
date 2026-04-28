@@ -1,69 +1,95 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Eye, Edit, Trash2, CheckCircle, Loader2, FileText } from 'lucide-react'
-import { invoicesApi } from '@/api/invoices'
+import { Plus, Eye, Edit, Trash2, Send, Loader2, BookOpen } from 'lucide-react'
+import { journalEntriesApi } from '@/api/journalEntries'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import StatusBadge from '@/components/ui/StatusBadge'
 import Spinner from '@/components/ui/Spinner'
 import Pagination from '@/components/ui/Pagination'
 import PageHeader from '@/components/layout/PageHeader'
-import type { Invoice } from '@/types'
+import type { JournalEntry } from '@/types'
 
-export default function InvoicesPage() {
+export default function JournalEntriesPage() {
   const [page, setPage] = useState(1)
-  const [payingId, setPayingId] = useState<number | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [postingId, setPostingId] = useState<number | null>(null)
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['invoices', page],
-    queryFn: () => invoicesApi.list(page).then((r) => r.data),
+    queryKey: ['journal-entries', page, statusFilter],
+    queryFn: () =>
+      journalEntriesApi
+        .list(page, 15, statusFilter === 'all' ? undefined : statusFilter)
+        .then((r) => r.data),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => invoicesApi.destroy(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+    mutationFn: (id: number) => journalEntriesApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['journal-entries'] }),
   })
 
-  const payMutation = useMutation({
-    mutationFn: (id: number) => invoicesApi.pay(id),
+  const postMutation = useMutation({
+    mutationFn: (id: number) => journalEntriesApi.post(id),
     onSuccess: () => {
-      setPayingId(null)
-      qc.invalidateQueries({ queryKey: ['invoices'] })
+      setPostingId(null)
+      qc.invalidateQueries({ queryKey: ['journal-entries'] })
     },
-    onError: () => setPayingId(null),
+    onError: () => setPostingId(null),
   })
 
-  const handleDelete = (inv: Invoice) => {
-    if (confirm(`Hapus invoice ${inv.invoice_number}?`)) {
-      deleteMutation.mutate(inv.id)
+  const handleDelete = (entry: JournalEntry) => {
+    if (confirm(`Hapus jurnal ${entry.journal_number}?`)) {
+      deleteMutation.mutate(entry.id)
     }
   }
 
-  const handlePay = (inv: Invoice) => {
-    if (confirm(`Tandai ${inv.invoice_number} sebagai LUNAS dan posting jurnal?`)) {
-      setPayingId(inv.id)
-      payMutation.mutate(inv.id)
+  const handlePost = (entry: JournalEntry) => {
+    if (confirm(`Posting jurnal ${entry.journal_number}? Jurnal yang sudah diposting tidak bisa diubah.`)) {
+      setPostingId(entry.id)
+      postMutation.mutate(entry.id)
     }
   }
+
+  const getTotalDebit = (entry: JournalEntry) =>
+    entry.lines?.reduce((s, l) => s + Number(l.debit), 0) ?? 0
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Invoice"
-        description="Kelola invoice penjualan"
+        title="Jurnal Akuntansi"
+        description="Kelola jurnal entri double-entry"
         action={
           <Button className="gap-2 shadow-sm">
-            <Link to="/invoices/create" className="flex items-center gap-2">
+            <Link to="/journal-entries/create" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
-              Buat Invoice
+              Buat Jurnal
             </Link>
           </Button>
         }
       />
+
+      {/* Filter */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filter Status</span>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => { setStatusFilter(v); setPage(1) }}
+        >
+          <SelectTrigger className="w-36 h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua</SelectItem>
+            <SelectItem value="draft">Draf</SelectItem>
+            <SelectItem value="posted">Diposting</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <Card className="shadow-sm border border-gray-200 rounded-xl overflow-hidden">
         <CardContent className="p-0">
@@ -77,19 +103,19 @@ export default function InvoicesPage() {
                 <TableHeader>
                   <TableRow className="bg-gray-50 border-b border-gray-200 hover:bg-gray-50">
                     <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide pl-6 py-3 w-[160px]">
-                      Nomor Invoice
+                      Nomor
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[120px]">
                       Tanggal
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3">
-                      Customer
+                      Deskripsi
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[130px]">
-                      Jatuh Tempo
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[180px]">
+                      Referensi
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 text-right w-[150px]">
-                      Total
+                      Total Debit
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[110px]">
                       Status
@@ -104,85 +130,87 @@ export default function InvoicesPage() {
                   {data?.data.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7}>
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+                        <div className="flex flex-col items-center justify-center py-20 gap-3">
                           <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-gray-300" />
+                            <BookOpen className="w-6 h-6 text-gray-300" />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-medium text-gray-500">Belum ada invoice</p>
-                            <p className="text-xs text-gray-400 mt-1">Buat invoice pertama Anda sekarang</p>
+                            <p className="text-sm font-medium text-gray-500">Belum ada jurnal</p>
+                            <p className="text-xs text-gray-400 mt-1">Buat jurnal entri pertama Anda</p>
                           </div>
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
 
-                  {data?.data.map((inv, index) => (
+                  {data?.data.map((entry, index) => (
                     <TableRow
-                      key={inv.id}
+                      key={entry.id}
                       className={`
                         border-b border-gray-100 transition-colors duration-100
                         hover:bg-blue-50/40
                         ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
                       `}
                     >
-                      {/* Nomor Invoice */}
+                      {/* Nomor */}
                       <TableCell className="pl-6 py-4">
                         <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 whitespace-nowrap">
-                          {inv.invoice_number}
+                          {entry.journal_number}
                         </span>
                       </TableCell>
 
                       {/* Tanggal */}
                       <TableCell className="py-4">
-                        <span className="text-sm text-gray-600">{formatDate(inv.invoice_date)}</span>
+                        <span className="text-sm text-gray-600">{formatDate(entry.entry_date)}</span>
                       </TableCell>
 
-                      {/* Customer */}
+                      {/* Deskripsi */}
                       <TableCell className="py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 select-none">
-                            {inv.customer_name?.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="text-sm font-medium text-gray-800 truncate max-w-[200px]">
-                            {inv.customer_name}
+                        <span className="text-sm text-gray-700 truncate max-w-xs block">
+                          {entry.description ?? '—'}
+                        </span>
+                      </TableCell>
+
+                      {/* Referensi */}
+                      <TableCell className="py-4">
+                        {entry.reference ? (
+                          <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
+                            {entry.reference}
                           </span>
-                        </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
                       </TableCell>
 
-                      {/* Jatuh Tempo */}
-                      <TableCell className="py-4">
-                        <span className="text-sm text-gray-600">{formatDate(inv.due_date)}</span>
-                      </TableCell>
-
-                      {/* Total */}
+                      {/* Total Debit */}
                       <TableCell className="py-4 text-right">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatCurrency(inv.grand_total)}
+                          {formatCurrency(getTotalDebit(entry))}
                         </span>
                       </TableCell>
 
                       {/* Status */}
                       <TableCell className="py-4">
-                        <StatusBadge status={inv.status} />
+                        <StatusBadge status={entry.status} />
                       </TableCell>
 
                       {/* Aksi */}
                       <TableCell className="py-4 pr-6">
                         <div className="flex justify-end items-center gap-0.5">
-                          {/* View */}
+                          {/* Lihat */}
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
                             asChild
+                            title="Lihat detail"
                           >
-                            <Link to={`/invoices/${inv.id}`}>
+                            <Link to={`/journal-entries/${entry.id}`}>
                               <Eye className="w-3.5 h-3.5" />
                             </Link>
                           </Button>
 
-                          {inv.status !== 'paid' && inv.status !== 'cancelled' && (
+                          {entry.status === 'draft' && (
                             <>
                               {/* Edit */}
                               <Button
@@ -190,25 +218,26 @@ export default function InvoicesPage() {
                                 size="icon"
                                 className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                                 asChild
+                                title="Edit"
                               >
-                                <Link to={`/invoices/${inv.id}/edit`}>
+                                <Link to={`/journal-entries/${entry.id}/edit`}>
                                   <Edit className="w-3.5 h-3.5" />
                                 </Link>
                               </Button>
 
-                              {/* Bayar */}
+                              {/* Posting */}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                                onClick={() => handlePay(inv)}
-                                disabled={payingId === inv.id}
-                                title="Tandai Lunas"
+                                onClick={() => handlePost(entry)}
+                                disabled={postingId === entry.id}
+                                title="Posting jurnal"
                               >
-                                {payingId === inv.id ? (
+                                {postingId === entry.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
-                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <Send className="w-3.5 h-3.5" />
                                 )}
                               </Button>
 
@@ -217,8 +246,8 @@ export default function InvoicesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                                onClick={() => handleDelete(inv)}
-                                title="Hapus Invoice"
+                                onClick={() => handleDelete(entry)}
+                                title="Hapus"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -231,7 +260,6 @@ export default function InvoicesPage() {
                 </TableBody>
               </Table>
 
-              {/* Pagination */}
               {(data?.last_page ?? 1) > 1 && (
                 <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
                   <p className="text-xs text-gray-400">

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Edit, Trash2, Calculator } from 'lucide-react'
+import { Plus, Edit, Trash2, Calculator, Landmark } from 'lucide-react'
 import { fixedAssetsApi } from '@/api/fixedAssets'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,60 +28,170 @@ export default function FixedAssetsPage() {
   })
 
   const handleDelete = (asset: FixedAsset) => {
-    if (confirm(`Hapus aset ${asset.name}?`)) deleteMutation.mutate(asset.id)
+    if (confirm(`Hapus aset ${asset.name}?`)) {
+      deleteMutation.mutate(asset.id)
+    }
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Aset Tetap"
         description="Kelola aset tetap dan penyusutan"
         action={
-          <Button asChild>
-            <Link to="/fixed-assets/create"><Plus className="w-4 h-4 mr-2" />Tambah Aset</Link>
+          <Button className="gap-2 shadow-sm">
+            <Link to="/fixed-assets/create" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Tambah Aset
+            </Link>
           </Button>
         }
       />
-      <Card>
+
+      <Card className="shadow-sm border border-gray-200 rounded-xl overflow-hidden">
         <CardContent className="p-0">
-          {isLoading ? <Spinner /> : (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-24">
+              <Spinner />
+            </div>
+          ) : (
             <>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Kode</TableHead>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Tgl. Beli</TableHead>
-                    <TableHead className="text-right">Harga Beli</TableHead>
-                    <TableHead className="text-right">Nilai Buku</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                  <TableRow className="bg-gray-50 border-b border-gray-200 hover:bg-gray-50">
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide pl-6 py-3 w-[140px]">
+                      Kode
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3">
+                      Nama Aset
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[130px]">
+                      Tgl. Beli
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 text-right w-[150px]">
+                      Harga Beli
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 text-right w-[150px]">
+                      Nilai Buku
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 w-[110px]">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-500 uppercase tracking-wide pr-6 py-3 text-right w-[110px]">
+                      Aksi
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {data?.data.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-gray-400 py-12">Belum ada aset tetap</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={7}>
+                        <div className="flex flex-col items-center justify-center py-20 gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                            <Landmark className="w-6 h-6 text-gray-300" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-gray-500">Belum ada aset tetap</p>
+                            <p className="text-xs text-gray-400 mt-1">Tambahkan aset tetap pertama Anda</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                  {data?.data.map((asset) => (
-                    <TableRow key={asset.id}>
-                      <TableCell className="font-mono text-xs font-medium">{asset.asset_code}</TableCell>
-                      <TableCell className="font-medium">{asset.name}</TableCell>
-                      <TableCell className="text-sm">{formatDate(asset.acquisition_date)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(asset.cost)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(asset.book_value)}</TableCell>
-                      <TableCell><StatusBadge status={asset.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" asChild title="Catat Penyusutan">
-                            <Link to={`/fixed-assets/${asset.id}/depreciation`}><Calculator className="w-4 h-4" /></Link>
+
+                  {data?.data.map((asset, index) => (
+                    <TableRow
+                      key={asset.id}
+                      className={`
+                        border-b border-gray-100 transition-colors duration-100
+                        hover:bg-blue-50/40
+                        ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
+                      `}
+                    >
+                      {/* Kode */}
+                      <TableCell className="pl-6 py-4">
+                        <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 whitespace-nowrap">
+                          {asset.asset_code}
+                        </span>
+                      </TableCell>
+
+                      {/* Nama */}
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 select-none">
+                            {asset.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium text-gray-800 truncate max-w-[220px]">
+                            {asset.name}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      {/* Tgl. Beli */}
+                      <TableCell className="py-4">
+                        <span className="text-sm text-gray-600">{formatDate(asset.acquisition_date)}</span>
+                      </TableCell>
+
+                      {/* Harga Beli */}
+                      <TableCell className="py-4 text-right">
+                        <span className="text-sm text-gray-600 tabular-nums">
+                          {formatCurrency(asset.cost)}
+                        </span>
+                      </TableCell>
+
+                      {/* Nilai Buku */}
+                      <TableCell className="py-4 text-right">
+                        <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                          {formatCurrency(asset.book_value)}
+                        </span>
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell className="py-4">
+                        <StatusBadge status={asset.status} />
+                      </TableCell>
+
+                      {/* Aksi */}
+                      <TableCell className="py-4 pr-6">
+                        <div className="flex justify-end items-center gap-0.5">
+                          {/* Penyusutan */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            asChild
+                            title="Catat Penyusutan"
+                          >
+                            <Link to={`/fixed-assets/${asset.id}/depreciation`}>
+                              <Calculator className="w-3.5 h-3.5" />
+                            </Link>
                           </Button>
+
+                          {/* Edit */}
                           {asset.status !== 'fully_depreciated' && asset.status !== 'disposed' && (
-                            <Button variant="ghost" size="icon" asChild>
-                              <Link to={`/fixed-assets/${asset.id}/edit`}><Edit className="w-4 h-4" /></Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                              asChild
+                              title="Edit Aset"
+                            >
+                              <Link to={`/fixed-assets/${asset.id}/edit`}>
+                                <Edit className="w-3.5 h-3.5" />
+                              </Link>
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDelete(asset)}>
-                            <Trash2 className="w-4 h-4" />
+
+                          {/* Hapus */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            onClick={() => handleDelete(asset)}
+                            title="Hapus Aset"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -89,9 +199,19 @@ export default function FixedAssetsPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="px-4 pb-4">
-                <Pagination currentPage={data?.current_page ?? 1} lastPage={data?.last_page ?? 1} onPageChange={setPage} />
-              </div>
+
+              {(data?.last_page ?? 1) > 1 && (
+                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-xs text-gray-400">
+                    Halaman {data?.current_page ?? 1} dari {data?.last_page ?? 1}
+                  </p>
+                  <Pagination
+                    currentPage={data?.current_page ?? 1}
+                    lastPage={data?.last_page ?? 1}
+                    onPageChange={setPage}
+                  />
+                </div>
+              )}
             </>
           )}
         </CardContent>

@@ -68,6 +68,7 @@ class ReportService
             ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
             ->where('journal_entries.status', 'posted')
             ->whereBetween('journal_entries.entry_date', [$start->toDateString(), $end->toDateString()])
+            ->where(fn ($q) => $q->whereNull('journal_entries.reference')->orWhere('journal_entries.reference', 'not like', 'CLOSING-%'))
             ->groupBy('accounts.id', 'accounts.code', 'accounts.name')
             ->orderBy('accounts.code')
             ->select([
@@ -230,6 +231,7 @@ class ReportService
             ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
             ->where('journal_entries.status', JournalEntry::STATUS_POSTED)
             ->whereBetween('journal_entries.entry_date', [$start->toDateString(), $end->toDateString()])
+            ->where(fn ($q) => $q->whereNull('journal_entries.reference')->orWhere('journal_entries.reference', 'not like', 'CLOSING-%'))
             ->whereIn('accounts.type', $types)
             ->groupBy('accounts.id', 'accounts.code', 'accounts.name', 'accounts.type')
             ->orderBy('accounts.code')
@@ -302,6 +304,89 @@ class ReportService
                     'balance'      => $balance,
                 ];
             });
+    }
+
+    /**
+     * Buku Kas Harian — menampilkan mutasi akun Kas/Bank
+     * dengan saldo berjalan (running balance) per baris.
+     *
+     * @param  string[]  $accountCodes  Kode akun yang ingin ditampilkan (default: Kas + Bank)
+     * @return array<string, mixed>
+     */
+    public function cashBook(Carbon $start, Carbon $end, array $accountCodes = ['1-1100', '1-1200']): array
+    {
+        // Saldo awal: akumulasi semua transaksi sebelum tanggal mulai
+        $openingRows = JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->where('journal_entries.status', JournalEntry::STATUS_POSTED)
+            ->where('journal_entries.entry_date', '<', $start->toDateString())
+            ->whereIn('accounts.code', $accountCodes)
+            ->selectRaw('SUM(journal_entry_lines.debit) as total_debit, SUM(journal_entry_lines.credit) as total_credit')
+            ->first();
+
+        $openingBalance = round(
+            (float) ($openingRows->total_debit ?? 0) - (float) ($openingRows->total_credit ?? 0),
+            2
+        );
+
+        // Baris transaksi dalam periode
+        $lines = JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->join('accounts', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->where('journal_entries.status', JournalEntry::STATUS_POSTED)
+            ->whereBetween('journal_entries.entry_date', [$start->toDateString(), $end->toDateString()])
+            ->whereIn('accounts.code', $accountCodes)
+            ->orderBy('journal_entries.entry_date')
+            ->orderBy('journal_entries.id')
+            ->orderBy('journal_entry_lines.sort_order')
+            ->select([
+                'journal_entries.entry_date',
+                'journal_entries.journal_number',
+                'journal_entries.description as journal_description',
+                'journal_entry_lines.description as line_description',
+                'accounts.code as account_code',
+                'accounts.name as account_name',
+                'journal_entry_lines.debit',
+                'journal_entry_lines.credit',
+            ])
+            ->get();
+
+        $runningBalance = $openingBalance;
+        $rows = $lines->map(function ($row) use (&$runningBalance): array {
+            $debit  = round((float) $row->debit, 2);
+            $credit = round((float) $row->credit, 2);
+            // Kas/Bank adalah aset: debit = masuk, credit = keluar
+            $runningBalance = round($runningBalance + $debit - $credit, 2);
+
+            return [
+                'date'           => $row->entry_date,
+                'journal_number' => $row->journal_number,
+                'description'    => $row->line_description ?? $row->journal_description,
+                'account_code'   => $row->account_code,
+                'account_name'   => $row->account_name,
+                'pemasukan'      => $debit > 0 ? $debit : null,
+                'pengeluaran'    => $credit > 0 ? $credit : null,
+                'saldo'          => $runningBalance,
+            ];
+        });
+
+        $totalPemasukan  = round($lines->sum('debit'), 2);
+        $totalPengeluaran = round($lines->sum('credit'), 2);
+        $closingBalance  = round($openingBalance + $totalPemasukan - $totalPengeluaran, 2);
+
+        return [
+            'period' => [
+                'start_date' => $start->toDateString(),
+                'end_date'   => $end->toDateString(),
+            ],
+            'account_codes'     => $accountCodes,
+            'opening_balance'   => $openingBalance,
+            'total_pemasukan'   => $totalPemasukan,
+            'total_pengeluaran' => $totalPengeluaran,
+            'closing_balance'   => $closingBalance,
+            'rows'              => $rows,
+        ];
     }
 
     /**

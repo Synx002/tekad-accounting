@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             ChartOfAccountsSeeder::class,
             AccountMappingSeeder::class,
+            DummyDataSeeder::class,
         ]);
 
         // User::factory(10)->create();

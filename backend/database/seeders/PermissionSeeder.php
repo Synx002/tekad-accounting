@@ -38,6 +38,7 @@ class PermissionSeeder extends Seeder
             'report.business.view',
             'report.income-statement.view',
             'report.balance-sheet.view',
+            'report.cash-book.view',
             'ledger.account.view',
             'ledger.account.manage',
             'ledger.journal.view',
@@ -81,6 +82,7 @@ class PermissionSeeder extends Seeder
             'report.business.view',
             'report.income-statement.view',
             'report.balance-sheet.view',
+            'report.cash-book.view',
             'ledger.account.view',
             'ledger.account.manage',
             'ledger.journal.view',
@@ -99,6 +101,7 @@ class PermissionSeeder extends Seeder
             'inventory.view',
             'inventory.update',
             'report.business.view',
+            'report.cash-book.view',
         ]);
 
         $viewer = Role::findByName('Viewer', 'web');
@@ -112,6 +115,7 @@ class PermissionSeeder extends Seeder
             'report.business.view',
             'report.income-statement.view',
             'report.balance-sheet.view',
+            'report.cash-book.view',
             'ledger.account.view',
             'ledger.journal.view',
         ]);

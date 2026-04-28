@@ -49,6 +49,24 @@ class ReportController extends Controller
         );
     }
 
+    public function cashBook(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'start_date'    => ['required', 'date'],
+            'end_date'      => ['required', 'date', 'after_or_equal:start_date'],
+            'account_codes' => ['nullable', 'array'],
+            'account_codes.*' => ['string'],
+        ]);
+
+        $start = Carbon::parse($data['start_date'])->startOfDay();
+        $end   = Carbon::parse($data['end_date'])->startOfDay();
+        $codes = $data['account_codes'] ?? ['1-1100', '1-1200'];
+
+        return response()->json(
+            $this->reportService->cashBook($start, $end, $codes)
+        );
+    }
+
     public function incomeStatement(Request $request): JsonResponse
     {
         $data = $request->validate([
